@@ -1,3 +1,4 @@
 models/
-logs/result_logger/
+logs/result_logger/*
 reports/
+!logs/result_logger/.gitkeep
