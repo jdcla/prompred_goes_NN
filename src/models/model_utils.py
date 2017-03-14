@@ -125,7 +125,7 @@ def conv_network(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay,
     x_image = tf.reshape(x, [-1,1,50,4])
     padding = motif_length//2 if padding is True else 0
     pool_list = [] 
-    par_conv = math.ceil(50/motif_length)
+    motifs = math.ceil(50/motif_length)*motifs
     flat_layer = (motifs*(math.ceil(50/motif_length)))
 
     with tf.variable_scope('conv1') as scope:
