@@ -129,20 +129,21 @@ def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_o
 
 def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, motifs, motif_length, stdev,
 					stdev_out, w_decay, w_out_decay, batch_size=40, train_step=1e-4, test_size=0.1, extra_layer=False):
-
+	hyp_string = "model_label:{} , motif_length:{} , motifs: {}, stdev: {}, stdev_out: {}, w_decay: {}, w_out_decay: {}".format(model_label, 
+								motif_length, motifs, stdev, stdev_out, w_decay, w_out_decay)
 	localarg = locals()
-	LOGFILENAME, MAINLOG, RESULTLOG = log.LogInit(function, model_label, localarg)
-	#X, Y = load_data(experiment, cutoff)
-	X, Y = fu.LoadDataTSS("../data/external/promotor_list_exp_growth.csv", experiment)
-	#ratio = sum(Y[:,1]==1)/len(Y)
-	ratio = 0.012
+	LOGFILENAME, MAINLOG, RESULTLOG = log.LogInit(function, model_label, localarg, hyp_string)
+	X, Y = load_data(experiment, cutoff)
+	ratio = sum(Y[:,1]==1)/len(Y)
+	#X, Y = fu.LoadDataTSS("../data/external/promotor_list_exp_growth.csv", experiment)
+	#ratio = 0.012
 	
 	for repeat in range(repeats):
 		x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op = load_model(model_label, ratio, 
 									motifs, motif_length, stdev, stdev_out, w_decay, w_out_decay, train_step, extra_layer)
 		results = run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op, 
 							X, Y, model_label, epochs, motif_length, batch_size, test_size)
-		log.LogWrap(MAINLOG, RESULTLOG, repeat, results)
+		log.LogWrap(MAINLOG, RESULTLOG, results, repeat, repeats)
 
 
 def main():

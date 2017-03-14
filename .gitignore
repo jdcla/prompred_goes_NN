@@ -1,4 +1,5 @@
 models/
 logs/result_logger/*
+logs/hpc_results/*
 reports/
 !logs/result_logger/.gitkeep

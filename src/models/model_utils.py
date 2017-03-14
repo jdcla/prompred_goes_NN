@@ -86,7 +86,7 @@ def par_conv_split(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay
         x_sub_image_length = len(range(i_start,i_end))
         x_sub_image = x_image[:,:,i_start:i_end,:]
         with tf.variable_scope('conv{}'.format(conv)) as scope:    
-            kernel = variable_with_w_decay('weights',
+            kernel = variable_with_weight_decay('weights',
                                              shape=[1, motif_length, 4, motifs],
                                              stddev=stdev,
                                              wd=w_decay)
@@ -111,7 +111,7 @@ def par_conv_split(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay
             layer2 = tf.nn.relu(tf.matmul(layer2, weights) + biases)
 
     with tf.variable_scope('out') as scope:
-        weights = variable_with_w_decay('weights', shape=[motifs*par_conv, num_classes],
+        weights = variable_with_weight_decay('weights', shape=[motifs*par_conv, num_classes],
                                           stddev=stdev_out, wd=w_out_decay)
         biases = variable_on_cpu('biases', num_classes, tf.constant_initializer(0))
         softmax_linear = tf.nn.sigmoid(tf.matmul(layer2, weights) + biases)
@@ -171,14 +171,14 @@ def conv_network(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay,
 def SelectModel(model_label, x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay, 
                 w_out_decay, num_classes=2, padding=False, extra_layer=False):
     
-    if model_label == "MS":
+    if model_label == "MS1":
         model = conv_network(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay,
                              w_out_decay, False, num_classes, padding, extra_layer)
-    if model_label == "MS1":
+    if model_label == "MS2":
         model = conv_network(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay, 
                              w_out_decay, True, num_classes, padding, extra_layer)
     
-    if model_label == "MS2":
+    if model_label == "MS3":
         model = par_conv_split(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay,
                                w_out_decay, num_classes, padding, extra_layer)
         
