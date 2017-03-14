@@ -82,3 +82,8 @@ STARTED 2017-03-14_12-33_eval_MS2
 	hyper-parameters: model_label:MS2 , motif_length:10 , motifs: 5, stdev: 0.001, stdev_out: 0.001, w_decay: 1e-10, w_out_decay: 1e-06
 	arguments: {'batch_size': 40, 'train_step': 0.0001, 'hyp_string': 'model_label:MS2 , motif_length:10 , motifs: 5, stdev: 0.001, stdev_out: 0.001, w_decay: 1e-10, w_out_decay: 1e-06', 'stdev': 0.001, 'model_label': 'MS2', 'experiment': 'RPOD', 'function': 'eval', 'test_size': 0.1, 'cutoff': 2.0, 'extra_layer': False, 'motifs': 5, 'epochs': 2, 'stdev_out': 0.001, 'motif_length': 10, 'w_out_decay': 1e-06, 'repeats': 2, 'w_decay': 1e-10}
 ...FINISHED
+
+STARTED 2017-03-14_13-55_eval_MS3
+	hyper-parameters: model_label:MS3 , motif_length:10 , motifs: 5, stdev: 0.001, stdev_out: 0.001, w_decay: 1e-10, w_out_decay: 1e-06
+	arguments: {'function': 'eval', 'w_decay': 1e-10, 'batch_size': 40, 'model_label': 'MS3', 'train_step': 0.0001, 'extra_layer': False, 'stdev': 0.001, 'motifs': 5, 'cutoff': 1.5, 'motif_length': 10, 'stdev_out': 0.001, 'epochs': 40, 'hyp_string': 'model_label:MS3 , motif_length:10 , motifs: 5, stdev: 0.001, stdev_out: 0.001, w_decay: 1e-10, w_out_decay: 1e-06', 'repeats': 1, 'experiment': 'RPOD', 'test_size': 0.1, 'w_out_decay': 1e-06}
+...FINISHED

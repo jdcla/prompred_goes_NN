@@ -10,7 +10,7 @@ import datetime as dt
 import pandas as pd
 
 def LogInit(function, model, arg_dict, hyp_string):
-    time = dt.datetime.now().strftime('%Y-%m-%d_%H-%M') 
+    time = dt.datetime.now().strftime('%Y-%m-%d_%H-%M-%S') 
     LOGFILENAME = '{}_{}_{}'.format(time, function, model)
     RESULTLOG = '../logs/result_logger/'+LOGFILENAME
     
