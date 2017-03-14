@@ -17,8 +17,7 @@ def CalculateAUC(pred, true):
     Calculate AUC given both the true and predicted labels of a dataset
     
     INPUT
-    ------
-    
+    ------   
     pred: np.array
         Predicted labels
         
@@ -26,8 +25,7 @@ def CalculateAUC(pred, true):
         True labels
         
     OUTPUT
-    -------
-    
+    -------   
     auc: scalar
         AUC
     """
@@ -52,7 +50,7 @@ def variable_on_cpu(name, shape, initializer):
         var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype)
     return var
 
-def variable_with_w_decay(name, shape, stddev, wd):
+def variable_with_weight_decay(name, shape, stddev, wd):
     """Helper to create an initialized Variable with weight decay.
     Note that the Variable is initialized with a truncated normal distribution.
     A weight decay is added only if one is specified.
@@ -74,7 +72,7 @@ def variable_with_w_decay(name, shape, stddev, wd):
     return var
 
 def par_conv_split(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay, 
-                   w_out_decay, num_classes=2, padding=False):
+                   w_out_decay, num_classes=2, padding=False, extra_layer=False):
     
     x_image = tf.reshape(x, [-1,1,50,4])
     padding = motif_length//2 if padding is True else 0
@@ -101,24 +99,88 @@ def par_conv_split(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay
             pool_unit = tf.nn.max_pool(conv_act, ksize=[1, 1, x_sub_image_length, 1], 
                         strides=[1, 1, x_sub_image_length, 1], padding='SAME')
             pool_flat = tf.reshape(pool_unit, [-1, motifs])
-
-        pool_list.append(pool_flat)
-
+            pool_list.append(pool_flat)
+            
+    layer2 = tf.reshape(tf.concat(pool_list,1),[-1, motifs*par_conv])
+    
+    if extra_layer is True:
+        with tf.variable_scope('fully_connected'):
+            weights = variable_with_weight_decay('weights', shape=[motifs*par_conv, motifs*par_conv],
+                                              stddev=stdev_out, wd=w_out_decay)
+            biases = variable_on_cpu('biases', motifs*par_conv, tf.constant_initializer(0.1))
+            layer2 = tf.nn.relu(tf.matmul(layer2, weights) + biases)
 
     with tf.variable_scope('out') as scope:
-        reshape = tf.reshape(tf.concat(pool_list,1),[-1, motifs*par_conv])
         weights = variable_with_w_decay('weights', shape=[motifs*par_conv, num_classes],
                                           stddev=stdev_out, wd=w_out_decay)
         biases = variable_on_cpu('biases', num_classes, tf.constant_initializer(0))
-        softmax_linear = tf.nn.sigmoid(tf.matmul(reshape, weights) + biases)
+        softmax_linear = tf.nn.sigmoid(tf.matmul(layer2, weights) + biases)
 
         return softmax_linear
 
-def SelectModel(x, keep_prob, model_label, motifs, motif_length,stdev, stdev_out,
-                w_decay, w_out_decay):
-    if model_label == "PC":
-        model = par_conv_split(x, keep_prob, motifs, motif_length, 
-                               stdev, stdev_out, w_decay, w_out_decay)
+def conv_network(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay, 
+                 w_out_decay, single_pool=True, num_classes=2, padding=False,
+                 extra_layer=False):
+    
+    x_image = tf.reshape(x, [-1,1,50,4])
+    padding = motif_length//2 if padding is True else 0
+    pool_list = [] 
+    par_conv = math.ceil(50/motif_length)
+    flat_layer = (motifs*(math.ceil(50/motif_length)))
+
+    with tf.variable_scope('conv1') as scope:
+        kernel = variable_with_weight_decay('weights',
+                                             shape=[1, motif_length, 4, motifs],
+                                             stddev=stdev,
+                                             wd=w_decay)
+        conv = tf.nn.conv2d(x_image, kernel, [1, 1, 1, 1], padding='SAME')
+        biases = variable_on_cpu('biases', [motifs], tf.constant_initializer(0))
+        pre_activation = tf.nn.bias_add(conv, biases)
+        conv1 = tf.nn.relu(pre_activation, name=scope.name)
+    
+    if single_pool == True:
+        pool1 = tf.nn.max_pool(conv1, ksize=[1, 1, 50, 1], strides=[1, 1, 50, 1],
+                             padding='SAME', name='pool1')
+        layer2 = tf.reshape(pool1, [-1, motifs])
+        full_connect = motifs
+    if single_pool == False:
+        pool1 = tf.nn.max_pool(conv1, ksize=[1, 1, motif_length, 1], strides=[1, 1, motif_length, 1],
+                             padding='SAME', name='pool1')
+        layer2 = tf.reshape(pool1, [-1, flat_layer])
+        full_connect = flat_layer
+    
+    if extra_layer is True:
+        with tf.variable_scope('fully_connected'):
+            weights = variable_with_weight_decay('weights', shape=[full_connect, full_connect],
+                                              stddev=stdev_out, wd=w_out_decay)
+            biases = variable_on_cpu('biases', full_connect, tf.constant_initializer(0.1))
+            fully_connected = tf.nn.relu(tf.matmul(layer2, weights) + biases)
+            layer2 = tf.nn.dropout(fully_connected, keep_prob)
+
+    with tf.variable_scope('out') as scope:
+        weights = variable_with_weight_decay('weights', [full_connect, num_classes],
+                                              stddev=stdev_out, wd=w_out_decay)
+        biases = variable_on_cpu('biases', [num_classes],
+                                  tf.constant_initializer(0))
+        softmax_linear = tf.sigmoid(tf.matmul(layer2, weights) + biases)
+
+
+    return softmax_linear
+    
+
+def SelectModel(model_label, x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay, 
+                w_out_decay, num_classes=2, padding=False, extra_layer=False):
+    
+    if model_label == "MS":
+        model = conv_network(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay,
+                             w_out_decay, False, num_classes, padding, extra_layer)
+    if model_label == "MS1":
+        model = conv_network(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay, 
+                             w_out_decay, True, num_classes, padding, extra_layer)
+    
+    if model_label == "MS2":
+        model = par_conv_split(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay,
+                               w_out_decay, num_classes, padding, extra_layer)
         
     return model
         

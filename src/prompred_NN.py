@@ -34,7 +34,7 @@ def load_data(experiment, cutoff):
 	return X_full, Y_full 
 
 def load_model(model_label, ratio, motifs, motif_length, stdev, stdev_out, w_decay, 
-				w_out_decay, train_step):
+				w_out_decay, train_step, extra_layer):
 
 	tf.reset_default_graph()
 	x = tf.placeholder(tf.float32, shape=[None, 50, 4], name="x")
@@ -43,8 +43,8 @@ def load_model(model_label, ratio, motifs, motif_length, stdev, stdev_out, w_dec
 	accuracy = tf.placeholder(tf.float32)
 	class_weight = tf.constant([[ratio, 1.0 - ratio]])
 	with tf.name_scope('Model'):
-		softmax_linear = mu.SelectModel(x, keep_prob, model_label, motifs, motif_length, 
-										stdev, stdev_out, w_decay, w_out_decay)
+		softmax_linear = mu.SelectModel(model_label, x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay, 
+										w_out_decay, num_classes=2, padding=False, extra_layer=False)
 
 	with tf.name_scope('Loss'):
 		weight_per_label = tf.transpose( tf.matmul(y_, tf.transpose(class_weight)) )
@@ -77,13 +77,14 @@ def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_o
 	
 	
 	v_out = [v for v in tf.trainable_variables() if v.name == "out/weights:0"]
-	if model_label == "PC":
+	if model_label == "MS2":
 		par_conv = math.ceil(50/motif_length)
 		par_conv_names = []
 		for i in range(par_conv):
 			par_conv_names.append("conv{}/weights:0".format(i))
 		v = [v for v in tf.trainable_variables() if v.name in par_conv_names]
-	
+	else:
+		v = [v for v in tf.trainable_variables() if v.name == "conv1/weights:0"]
 	saver = tf.train.Saver()
 	
 	with tf.Session() as sess:
@@ -127,7 +128,7 @@ def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_o
 	return results
 
 def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, motifs, motif_length, stdev,
-					stdev_out, w_decay, w_out_decay, batch_size=40, train_step=1e-4, test_size=0.1):
+					stdev_out, w_decay, w_out_decay, batch_size=40, train_step=1e-4, test_size=0.1, extra_layer=False):
 
 	localarg = locals()
 	LOGFILENAME, MAINLOG, RESULTLOG = log.LogInit(function, model_label, localarg)
@@ -138,7 +139,7 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 	
 	for repeat in range(repeats):
 		x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op = load_model(model_label, ratio, 
-									motifs, motif_length, stdev, stdev_out, w_decay, w_out_decay, train_step)
+									motifs, motif_length, stdev, stdev_out, w_decay, w_out_decay, train_step, extra_layer)
 		results = run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op, 
 							X, Y, model_label, epochs, motif_length, batch_size, test_size)
 		log.LogWrap(MAINLOG, RESULTLOG, repeat, results)
@@ -147,21 +148,26 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 def main():
 	parser = argparse.ArgumentParser(description='high-end script function for prompred')
 	parser.add_argument('function', type=str,choices=('eval','no'), help="function to execute")
-	parser.add_argument('-d', '--data', type=str, choices=('RPOD'), help='chooses data experiment')
+	parser.add_argument('-d', '--data', type=str, choices=('RPOD', 'RPOS', 'RPON'), help='chooses data experiment')
 	parser.add_argument('-e', '--epochs', type=int, help='amount of epochs to train')
 	parser.add_argument('-r', '--repeats', type=int, help='amount of repeats of the experiment')
-	parser.add_argument('-m', '--model', type=str, choices=('PC'), help=' type of architecture of the model')
+	parser.add_argument('-m', '--model', type=str, choices=('MS1','MS2','MS3'), help=' type of architecture of the model')
 	parser.add_argument('-c', '--cutoff', type=float, help="cutoff value to select datasets from ")
-	parser.add_argument('-b', '--batch_size', type=int, help="determines batch size")
+	parser.add_argument('-b', '--batch_size', type=int, default=40, help="determines batch size")
 	parser.add_argument('-M', '--motifs', type=int, help="amount of motifs")
 	parser.add_argument('-ML', '--motif_length', type=int, help="motif length")
 	parser.add_argument('-S', '--stdev', type=float, help="stdev of the conv. layer")
 	parser.add_argument('-SO', '--stdev_out', type=float, help="stdev out layer")
 	parser.add_argument('-W', '--weight_dec', type=float, help="weight decay")
 	parser.add_argument('-WO', '--weight_dec_out', type=float, help="weight decay out")
+	parser.add_argument('-LS', '--learning_step', type=float, default=1e-4, help="learning step of the model")
+	parser.add_argument('-TS', '--test_size', type=float, default=0.1, help="fraction of the data used as a test set")
+	parser.add_argument('-F', '--fully_connected', action="store_true", help="add fully connected layer behind main layer")
+	
 	args = parser.parse_args()
 	ExecuteFunction(args.function,  args.model, args.data, args.epochs, args.repeats, args.cutoff, args.motifs,
-					args.motif_length, args.stdev, args.stdev_out, args.weight_dec, args.weight_dec_out)
+					args.motif_length, args.stdev, args.stdev_out, args.weight_dec, args.weight_dec_out, args.batch_size,
+					args.learning_step, args.test_size, args.fully_connected)
 
 
 
