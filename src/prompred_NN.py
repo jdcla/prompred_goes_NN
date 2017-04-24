@@ -70,7 +70,8 @@ def load_model(model_label, ratio, motifs, motif_length, stdev, stdev_out, w_dec
 	return x, y_, keep_prob, var_init, summary_op, softmax_linear, accuracy, loss, step_op
 
 
-def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op, X, Y, model_label, epochs, motif_length, batch_size, test_size):
+def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op,
+				X, Y, model_label, epochs, motif_length, batch_size, test_size, verbose):
 
 	X_train, X_test, Y_train, Y_test = fu.CreateBalancedTrainTest(X,Y, test_size)
 	A_X, A_Y, B_X, B_Y, R_X, R_Y, M_X, M_Y, D_X, D_Y = fu.LoadValidationData()
@@ -121,28 +122,28 @@ def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_o
 			losses.append(avg_loss)
 			if (avg_spear[-1] > .73) and (np.all(avg_spear[:-1]<avg_spear[-1])):
 				saver.save(sess,"../models/model_{:%m:%d:%H:%M}_{}_epoch{}.ckpt".format(dt.datetime.now(), avg_spear[-1], epoch))
-			summary_writer.add_summary(summary, epoch)
+			if verbose==True:
+				summary_writer.add_summary(summary, epoch)
 		saver.save(sess,"../models/model_{:%m:%d:%H:%M}_{:.3f}_epoch{}.ckpt".format(dt.datetime.now(), avg_spear[-1], epoch))
 	results = pd.DataFrame({"A_spear": A_spear, "B_spear": B_spear, "D_spear": D_spear, "R_spear": R_spear, "M_spear": M_spear, "AVG_spear": avg_spear, "AUC":AUCs})
 	
 	return results
 
 def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, motifs, motif_length, stdev,
-					stdev_out, w_decay, w_out_decay, batch_size=40, train_step=1e-4, test_size=0.1, extra_layer=False):
+					stdev_out, w_decay, w_out_decay, batch_size=40, train_step=1e-4, test_size=0.1, extra_layer=False,
+					verbose=False):
 	hyp_string = "model_label:{} , motif_length:{} , motifs: {}, stdev: {}, stdev_out: {}, w_decay: {}, w_out_decay: {}".format(model_label, 
 								motif_length, motifs, stdev, stdev_out, w_decay, w_out_decay)
 	localarg = locals()
 	LOGFILENAME, MAINLOG, RESULTLOG = log.LogInit(function, model_label, localarg, hyp_string)
 	X, Y = load_data(experiment, cutoff)
 	ratio = sum(Y[:,1]==1)/len(Y)
-	#X, Y = fu.LoadDataTSS("../data/external/promotor_list_exp_growth.csv", experiment)
-	#ratio = 0.012
 	
 	for repeat in range(repeats):
 		x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op = load_model(model_label, ratio, 
 									motifs, motif_length, stdev, stdev_out, w_decay, w_out_decay, train_step, extra_layer)
 		results = run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op, 
-							X, Y, model_label, epochs, motif_length, batch_size, test_size)
+							X, Y, model_label, epochs, motif_length, batch_size, test_size, verbose)
 		log.LogWrap(MAINLOG, RESULTLOG, results, repeat, repeats)
 
 
@@ -152,11 +153,11 @@ def main():
 	parser.add_argument('-d', '--data', type=str, choices=('RPOD', 'RPOS', 'RPON'), help='chooses data experiment')
 	parser.add_argument('-e', '--epochs', type=int, help='amount of epochs to train')
 	parser.add_argument('-r', '--repeats', type=int, help='amount of repeats of the experiment')
-	parser.add_argument('-m', '--model', type=str, choices=('MS1','MS2','MS3'), help=' type of architecture of the model')
+	parser.add_argument('-m', '--model', type=str, choices=('MS1','MS2','MS3','MS4'), help=' type of architecture of the model')
 	parser.add_argument('-c', '--cutoff', type=float, help="cutoff value to select datasets from ")
 	parser.add_argument('-b', '--batch_size', type=int, default=40, help="determines batch size")
 	parser.add_argument('-M', '--motifs', type=int, help="amount of motifs")
-	parser.add_argument('-ML', '--motif_length', type=int, help="motif length")
+	parser.add_argument('-ML', '--motif_length', type=int, nargs='+', help="motif length")
 	parser.add_argument('-S', '--stdev', type=float, help="stdev of the conv. layer")
 	parser.add_argument('-SO', '--stdev_out', type=float, help="stdev out layer")
 	parser.add_argument('-W', '--weight_dec', type=float, help="weight decay")
@@ -164,18 +165,14 @@ def main():
 	parser.add_argument('-LS', '--learning_step', type=float, default=1e-4, help="learning step of the model")
 	parser.add_argument('-TS', '--test_size', type=float, default=0.1, help="fraction of the data used as a test set")
 	parser.add_argument('-F', '--fully_connected', action="store_true", help="add fully connected layer behind main layer")
-	
+	parser.add_argument('-v', '--verbose', action="store_true", help="create tensorboard model summaries")
+
 	args = parser.parse_args()
 	ExecuteFunction(args.function,  args.model, args.data, args.epochs, args.repeats, args.cutoff, args.motifs,
 					args.motif_length, args.stdev, args.stdev_out, args.weight_dec, args.weight_dec_out, args.batch_size,
-					args.learning_step, args.test_size, args.fully_connected)
+					args.learning_step, args.test_size, args.fully_connected, args.verbose)
 
 
 
 if __name__ == "__main__":
     sys.exit(main())
-
-	#filter_list.append(np.reshape(sess.run(v),(par_conv,MOTIFS,MOTIF_LENGTH,4)))
-	#filter_out.append(np.array(sess.run(v_out))[0,:,:])
-#			accs_train.append(avg_acc)
-#			accs_test.append(acc_op.eval(feed_dict={x: X_test , y_: Y_test, keep_prob: 1}))

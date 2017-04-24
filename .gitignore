@@ -3,4 +3,5 @@ logs/result_logger/*
 logs/hpc_results/*
 logs/log.txt
 reports/
+notebooks/code_base/*
 !logs/result_logger/.gitkeep

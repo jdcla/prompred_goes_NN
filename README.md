@@ -1,4 +1,4 @@
-prompred
+prompred goes Neural Networks
 =============================
 
 Machine learning models in promoter prediction of microorganisms, using Neural Networks
@@ -8,7 +8,7 @@ Machine learning models in promoter prediction of microorganisms, using Neural N
 To use this package, simply clone the project into a local folder
 
 ```shell
-$ git clone https://github.com/jimclauwaert/prompred.git
+$ git clone https://github.com/jimclauwaert/prompred_goes_NN.git
 ```
 
 ## Code Example
@@ -18,13 +18,15 @@ The main module *prompred_NN.py* is located in src/
 The functionality of prompred can be directly accessed through the terminal. For more information on all implemented functions, simply type:
 
 ```shell
-$ python prompred.py -h
+$ python prompred_NN.py -h
 ```
 
-The following script executes a gridsearch for the parameters alpha and gamma for a ridge regression using a third degree polynomial kernel, with features extracted over the [-7 12] and [-7 12] regions of the promoters (with respect to the 35- and 10-box) 
+This module is used for research in promoter strength, using neural networks.
+
+
 
 ```shell
-$ python prompred.py GS -d ../data/external/mut_rand_mod_lib.csv -s -7 12 -7 12 -m ridge -k poly -g 3 --parL alpha gamma --parR 10 10  
+
 ``` 
 
 ## Project Organization

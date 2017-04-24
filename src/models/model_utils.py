@@ -71,6 +71,78 @@ def variable_with_weight_decay(name, shape, stddev, wd):
         tf.add_to_collection('losses', w_decay)
     return var
 
+def par_conv_split_duo(x, keep_prob, motifs, motif_length_1, motif_length_2, stdev, stdev_out, w_decay, 
+                   w_out_decay, num_classes=2, padding=False, extra_layer=False):
+    
+    x_image = tf.reshape(x, [-1,1,50,4])
+    padding = motif_length//2 if padding is True else 0
+    pool_list = [] 
+    par_conv_sh = math.ceil(50/motif_length_1)
+    par_conv_lo = math.ceil(50/motif_length_2)
+    for conv in range(par_conv_sh):
+        i_start = (50-(conv+1)*motif_length_1)-padding
+        i_end = (50-conv*motif_length_1)+padding
+        if i_start < 0:
+            i_start = 0
+        x_sub_image_length = len(range(i_start,i_end))
+        x_sub_image = x_image[:,:,i_start:i_end,:]
+        with tf.variable_scope('conv{}_sh'.format(conv)) as scope:    
+            kernel = variable_with_weight_decay('weights',
+                                             shape=[1, motif_length_1, 4, motifs],
+                                             stddev=stdev,
+                                             wd=w_decay)
+            conv_unit = tf.nn.conv2d(x_sub_image, kernel, [1, 1, 1, 1], padding='SAME')
+            biases = variable_on_cpu('biases', [motifs], tf.constant_initializer(0.001))
+            pre_activation = tf.nn.bias_add(conv_unit, biases)
+            conv_act = tf.nn.relu(pre_activation, name=scope.name)
+            
+        with tf.variable_scope('pool{}'.format(conv)) as scope:
+            pool_unit = tf.nn.max_pool(conv_act, ksize=[1, 1, x_sub_image_length, 1], 
+                        strides=[1, 1, x_sub_image_length, 1], padding='SAME')
+            pool_flat = tf.reshape(pool_unit, [-1, motifs])
+            pool_list.append(pool_flat)
+            
+    for conv in range(par_conv_lo):
+        i_start = (50-(conv+1)*motif_length_2)-padding
+        i_end = (50-conv*motif_length_2)+padding
+        if i_start < 0:
+            i_start = 0
+        x_sub_image_length = len(range(i_start,i_end))
+        x_sub_image = x_image[:,:,i_start:i_end,:]
+        with tf.variable_scope('conv{}_lo'.format(conv)) as scope:    
+            kernel = variable_with_weight_decay('weights',
+                                             shape=[1, motif_length_2, 4, motifs],
+                                             stddev=stdev,
+                                             wd=w_decay)
+            conv_unit = tf.nn.conv2d(x_sub_image, kernel, [1, 1, 1, 1], padding='SAME')
+            biases = variable_on_cpu('biases', [motifs], tf.constant_initializer(0.001))
+            pre_activation = tf.nn.bias_add(conv_unit, biases)
+            conv_act = tf.nn.relu(pre_activation, name=scope.name)
+            
+        with tf.variable_scope('pool{}'.format(conv)) as scope:
+            pool_unit = tf.nn.max_pool(conv_act, ksize=[1, 1, x_sub_image_length, 1], 
+                        strides=[1, 1, x_sub_image_length, 1], padding='SAME')
+            pool_flat = tf.reshape(pool_unit, [-1, motifs])
+            pool_list.append(pool_flat)
+            
+    num_connect_nodes = motifs*(par_conv_sh+par_conv_lo)
+    layer2 = tf.reshape(tf.concat(pool_list,1),[-1, num_connect_nodes])
+    
+    if extra_layer is True:
+        with tf.variable_scope('fully_connected'):
+            weights = variable_with_weight_decay('weights', shape=[num_connect_nodes, num_connect_nodes],
+                                              stddev=stdev_out, wd=w_out_decay)
+            biases = variable_on_cpu('biases', num_connect_nodes, tf.constant_initializer(0.1))
+            layer2 = tf.nn.relu(tf.matmul(layer2, weights) + biases)
+
+    with tf.variable_scope('out') as scope:
+        weights = variable_with_weight_decay('weights', shape=[num_connect_nodes, num_classes],
+                                          stddev=stdev_out, wd=w_out_decay)
+        biases = variable_on_cpu('biases', num_classes, tf.constant_initializer(0))
+        softmax_linear = tf.nn.sigmoid(tf.matmul(layer2, weights) + biases)
+
+        return softmax_linear
+
 def par_conv_split(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay, 
                    w_out_decay, num_classes=2, padding=False, extra_layer=False):
     
@@ -172,14 +244,17 @@ def SelectModel(model_label, x, keep_prob, motifs, motif_length, stdev, stdev_ou
                 w_out_decay, num_classes=2, padding=False, extra_layer=False):
     
     if model_label == "MS1":
-        model = conv_network(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay,
+        model = conv_network(x, keep_prob, motifs, motif_length[0], stdev, stdev_out, w_decay,
                              w_out_decay, False, num_classes, padding, extra_layer)
     if model_label == "MS2":
-        model = conv_network(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay, 
+        model = conv_network(x, keep_prob, motifs, motif_length[0], stdev, stdev_out, w_decay, 
                              w_out_decay, True, num_classes, padding, extra_layer)
     
     if model_label == "MS3":
-        model = par_conv_split(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay,
+        model = par_conv_split(x, keep_prob, motifs, motif_length[0], stdev, stdev_out, w_decay,
+                               w_out_decay, num_classes, padding, extra_layer)
+    if model_label == "MS4":
+        model = par_conv_split_duo(x, keep_prob, motifs, motif_length[0], motif_length[1], stdev, stdev_out, w_decay,
                                w_out_decay, num_classes, padding, extra_layer)
         
     return model
