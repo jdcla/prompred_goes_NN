@@ -156,7 +156,7 @@ def main():
 	parser.add_argument('-m', '--model', type=str, choices=('MS1','MS2','MS3','MS4'), help=' type of architecture of the model')
 	parser.add_argument('-c', '--cutoff', type=float, help="cutoff value to select datasets from ")
 	parser.add_argument('-b', '--batch_size', type=int, default=40, help="determines batch size")
-	parser.add_argument('-M', '--motifs', type=int, help="amount of motifs")
+	parser.add_argument('-M', '--motifs', type=int, nargs='+', help="amount of motifs")
 	parser.add_argument('-ML', '--motif_length', type=int, nargs='+', help="motif length")
 	parser.add_argument('-S', '--stdev', type=float, help="stdev of the conv. layer")
 	parser.add_argument('-SO', '--stdev_out', type=float, help="stdev out layer")
