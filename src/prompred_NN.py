@@ -3,6 +3,7 @@ matplotlib.use("Agg")
 import sys
 import json
 import math
+import random
 import argparse
 import numpy as np
 import pandas as pd
@@ -120,11 +121,11 @@ def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_o
 			D_spear.append(stats.spearmanr(softmax_op.eval(feed_dict={x: D_X , y_: Y_train[:len(M_X)], keep_prob: 1})[:,1], D_Y)[0])
 			avg_spear.append((A_spear[-1]+abs(B_spear[-1])+R_spear[-1]+M_spear[-1]+D_spear[-1])/5)
 			losses.append(avg_loss)
-			if (avg_spear[-1] > .73) and (np.all(avg_spear[:-1]<avg_spear[-1])):
-				saver.save(sess,"../models/model_{:%m:%d:%H:%M}_{}_epoch{}.ckpt".format(dt.datetime.now(), avg_spear[-1], epoch))
 			if verbose==True:
+				if (avg_spear[-1] > .73) and (np.all(avg_spear[:-1]<avg_spear[-1])):
+					saver.save(sess,"../models/model_{:%m:%d:%H:%M}_{}_epoch{}.ckpt".format(dt.datetime.now(), avg_spear[-1], epoch))
 				summary_writer.add_summary(summary, epoch)
-		saver.save(sess,"../models/model_{:%m:%d:%H:%M}_{:.3f}_epoch{}.ckpt".format(dt.datetime.now(), avg_spear[-1], epoch))
+				saver.save(sess,"../models/model_{:%m:%d:%H:%M}_{:.3f}_epoch{}.ckpt".format(dt.datetime.now(), avg_spear[-1], epoch))
 	results = pd.DataFrame({"A_spear": A_spear, "B_spear": B_spear, "D_spear": D_spear, "R_spear": R_spear, "M_spear": M_spear, "AVG_spear": avg_spear, "AUC":AUCs})
 	
 	return results
@@ -132,8 +133,22 @@ def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_o
 def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, motifs, motif_length, stdev,
 					stdev_out, w_decay, w_out_decay, batch_size=40, train_step=1e-4, test_size=0.1, extra_layer=False,
 					verbose=False):
-	hyp_string = "model_label:{} , motif_length:{} , motifs: {}, stdev: {}, stdev_out: {}, w_decay: {}, w_out_decay: {}".format(model_label, 
-								motif_length, motifs, stdev, stdev_out, w_decay, w_out_decay)
+	if function == "rand":
+		cutoff = random.choice([0,0.5,1,1.5,2])
+		if model_label != "MS4":
+			motifs = [random.choice([8,16,32,64,128])]
+			motif_length = [random.choice([10,17,25])]
+		else:
+			motifs = [random.choice([4,8,16,32,64]), random.choice([4,8,16,32,64])]
+			motif_length = random.sample([7,10,17,25],2)
+		stdev = random.choice([1e-1,1e-2,1e-3,1e-4,1e-5])
+		stdev_out = random.choice([1e-1,1e-2,1e-3,1e-4,1e-5])
+		w_decay = random.choice([1e-3,1e-5,1e-7,1e-9,1e-11])
+		w_out_decay = random.choice([1e-3,1e-5,1e-7,1e-9,1e-11])
+		extra_layer = random.choice([True, False])
+	
+	hyp_string = "model_label:{} , motif_length:{} , motifs: {}, stdev: {}, stdev_out: {}, w_decay: {}, w_out_decay: {}, fully_connect: {}".format(model_label, 
+								motif_length, motifs, stdev, stdev_out, w_decay, w_out_decay, extra_layer)
 	localarg = locals()
 	LOGFILENAME, MAINLOG, RESULTLOG = log.LogInit(function, model_label, localarg, hyp_string)
 	X, Y = load_data(experiment, cutoff)
@@ -144,12 +159,12 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 									motifs, motif_length, stdev, stdev_out, w_decay, w_out_decay, train_step, extra_layer)
 		results = run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op, 
 							X, Y, model_label, epochs, motif_length, batch_size, test_size, verbose)
-		log.LogWrap(MAINLOG, RESULTLOG, results, repeat, repeats)
+		log.LogWrap(MAINLOG, RESULTLOG, results, hyp_string, repeat, repeats)
 
 
 def main():
 	parser = argparse.ArgumentParser(description='high-end script function for prompred')
-	parser.add_argument('function', type=str,choices=('eval','no'), help="function to execute")
+	parser.add_argument('function', type=str,choices=('eval','no', 'rand'), help="function to execute")
 	parser.add_argument('-d', '--data', type=str, choices=('RPOD', 'RPOS', 'RPON'), help='chooses data experiment')
 	parser.add_argument('-e', '--epochs', type=int, help='amount of epochs to train')
 	parser.add_argument('-r', '--repeats', type=int, help='amount of repeats of the experiment')

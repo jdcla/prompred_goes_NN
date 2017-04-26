@@ -9,6 +9,12 @@ import json
 import datetime as dt
 import pandas as pd
 
+def line_prepender(filename, line):
+    with open(filename, 'r+') as f:
+        content = f.read()
+        f.seek(0, 0)
+        f.write(line.rstrip('\r\n') + '\n' + content)
+
 def LogInit(function, model, arg_dict, hyp_string):
     time = dt.datetime.now().strftime('%Y-%m-%d_%H-%M-%S') 
     LOGFILENAME = '{}_{}_{}'.format(time, function, model)
@@ -21,10 +27,14 @@ def LogInit(function, model, arg_dict, hyp_string):
     print(output)
     return LOGFILENAME, MAINLOG, RESULTLOG
     
-def LogWrap(MAINLOG, RESULTLOG, results, repeat, repeats):
+def LogWrap(MAINLOG, RESULTLOG, results, hyp_string, repeat, repeats):
 
-    results.to_csv("{}_{}.txt".format(RESULTLOG, repeat),index=False)
+    filename = "{}_{}.txt".format(RESULTLOG, repeat)
+    results.to_csv(filename,index=False)
     
+    line_prepender(filename, "##" + hyp_string)
+    
+        
     if repeat+1 == repeats:
         outputWrap = '\n...FINISHED'
         with open(MAINLOG, 'a') as f:
