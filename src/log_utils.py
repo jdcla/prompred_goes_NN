@@ -8,6 +8,7 @@ Created in the scope of my PhD
 import json
 import datetime as dt
 import pandas as pd
+import random
 
 def line_prepender(filename, line):
     with open(filename, 'r+') as f:
@@ -17,7 +18,7 @@ def line_prepender(filename, line):
 
 def LogInit(function, model, arg_dict, hyp_string):
     time = dt.datetime.now().strftime('%Y-%m-%d_%H-%M-%S') 
-    LOGFILENAME = '{}_{}_{}'.format(time, function, model)
+    LOGFILENAME = '{}_{}_{}__({})'.format(time, function, model, random.randint(0,9))
     RESULTLOG = '../logs/result_logger/'+LOGFILENAME
     
     MAINLOG = '../logs/log.txt'
