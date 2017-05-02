@@ -80,7 +80,7 @@ def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_o
 	
 	v_out = [v for v in tf.trainable_variables() if v.name == "out/weights:0"]
 	if model_label == "MS2":
-		par_conv = math.ceil(50/motif_length)
+		par_conv = math.ceil(50/motif_length[0])
 		par_conv_names = []
 		for i in range(par_conv):
 			par_conv_names.append("conv{}/weights:0".format(i))
