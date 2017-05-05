@@ -35,7 +35,7 @@ def load_data(experiment, cutoff):
 	return X_full, Y_full 
 
 def load_model(model_label, ratio, motifs, motif_length, stdev, stdev_out, w_decay, 
-				w_out_decay, train_step, extra_layer):
+				w_out_decay, pooling, train_step, extra_layer):
 
 	tf.reset_default_graph()
 	x = tf.placeholder(tf.float32, shape=[None, 50, 4], name="x")
@@ -45,7 +45,7 @@ def load_model(model_label, ratio, motifs, motif_length, stdev, stdev_out, w_dec
 	class_weight = tf.constant([[ratio, 1.0 - ratio]])
 	with tf.name_scope('Model'):
 		softmax_linear = mu.SelectModel(model_label, x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay, 
-										w_out_decay, num_classes=2, padding=False, extra_layer=False)
+										w_out_decay, pooling, num_classes=2, padding=False, extra_layer=False)
 
 	with tf.name_scope('Loss'):
 		weight_per_label = tf.transpose( tf.matmul(y_, tf.transpose(class_weight)) )
@@ -131,7 +131,7 @@ def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_o
 	return results
 
 def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, motifs, motif_length, stdev,
-					stdev_out, w_decay, w_out_decay, batch_size=40, train_step=1e-4, test_size=0.1, extra_layer=False,
+					stdev_out, w_decay, w_out_decay, pooling=1, batch_size=40, train_step=1e-4, test_size=0.1, extra_layer=False,
 					verbose=False):
 	if function == "rand":
 		cutoff = random.choice([0,0.5,1,1.5,2])
@@ -141,14 +141,15 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 		else:
 			motifs = [random.choice([4,8,16,32,64]), random.choice([4,8,16,32,64])]
 			motif_length = random.sample([7,10,17,25],2)
+		pooling = random.choice([-1,1,2])
 		stdev = random.choice([1e-1,1e-2,1e-3,1e-4,1e-5])
 		stdev_out = random.choice([1e-1,1e-2,1e-3,1e-4,1e-5])
 		w_decay = random.choice([1e-3,1e-5,1e-7,1e-9,1e-11])
 		w_out_decay = random.choice([1e-3,1e-5,1e-7,1e-9,1e-11])
 		extra_layer = random.choice([True, False])
 	
-	hyp_string = "model_label:{} , motif_length:{} , motifs: {}, stdev: {}, stdev_out: {}, w_decay: {}, w_out_decay: {}, fully_connect: {}".format(model_label, 
-								motif_length, motifs, stdev, stdev_out, w_decay, w_out_decay, extra_layer)
+	hyp_string = "model_label:{} , cutoff_value: {}, motif_length:{} , motifs: {}, stdev: {}, stdev_out: {}, w_decay: {}, w_out_decay: {}, pooling: {}, fully_connect: {}".format(model_label,  
+								cutoff, motif_length, motifs, stdev, stdev_out, w_decay, w_out_decay, pooling, extra_layer)
 	localarg = locals()
 	LOGFILENAME, MAINLOG, RESULTLOG = log.LogInit(function, model_label, localarg, hyp_string)
 	X, Y = load_data(experiment, cutoff)
@@ -156,7 +157,7 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 	
 	for repeat in range(repeats):
 		x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op = load_model(model_label, ratio, 
-									motifs, motif_length, stdev, stdev_out, w_decay, w_out_decay, train_step, extra_layer)
+									motifs, motif_length, stdev, stdev_out, w_decay, w_out_decay, pooling, train_step, extra_layer)
 		results = run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op, 
 							X, Y, model_label, epochs, motif_length, batch_size, test_size, verbose)
 		log.LogWrap(MAINLOG, RESULTLOG, results, hyp_string, repeat, repeats)
@@ -177,6 +178,7 @@ def main():
 	parser.add_argument('-SO', '--stdev_out', type=float, help="stdev out layer")
 	parser.add_argument('-W', '--weight_dec', type=float, help="weight decay")
 	parser.add_argument('-WO', '--weight_dec_out', type=float, help="weight decay out")
+	parser.add_argument('-P', '--pooling', type=int, choices=(-1,1,2), default=1, help="-1: avg pooling only, 1: max pooling only, 2: both pooling methods (features x2!)")
 	parser.add_argument('-LS', '--learning_step', type=float, default=1e-4, help="learning step of the model")
 	parser.add_argument('-TS', '--test_size', type=float, default=0.1, help="fraction of the data used as a test set")
 	parser.add_argument('-F', '--fully_connected', action="store_true", help="add fully connected layer behind main layer")
@@ -184,7 +186,7 @@ def main():
 
 	args = parser.parse_args()
 	ExecuteFunction(args.function,  args.model, args.data, args.epochs, args.repeats, args.cutoff, args.motifs,
-					args.motif_length, args.stdev, args.stdev_out, args.weight_dec, args.weight_dec_out, args.batch_size,
+					args.motif_length, args.stdev, args.stdev_out, args.weight_dec, args.weight_dec_out, args.pooling, args.batch_size,
 					args.learning_step, args.test_size, args.fully_connected, args.verbose)
 
 
