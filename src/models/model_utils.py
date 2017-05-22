@@ -218,7 +218,7 @@ def conv_network(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay,
     padding = motif_length//2 if padding is True else 0
     motifs = math.ceil(50/motif_length)*motifs
     if single_pool:
-        num_pool_values = motifs*abs()
+        num_pool_values = motifs
         pool_stride = 50
     else:
         num_pool_values = (motifs*(math.ceil(50/motif_length)))

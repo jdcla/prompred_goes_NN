@@ -3,7 +3,6 @@ matplotlib.use("Agg")
 import sys
 import json
 import math
-import random
 import argparse
 import numpy as np
 import pandas as pd
@@ -134,19 +133,20 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 					stdev_out, w_decay, w_out_decay, pooling=1, batch_size=40, train_step=1e-4, test_size=0.1, extra_layer=False,
 					verbose=False):
 	if function == "rand":
-		cutoff = random.choice([0,0.5,1,1.5,2])
+		cutoff = np.random.choice([-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.25,1.5,2,2.5])
+		#cutoff = np.random.uniform([0,2.5])
 		if model_label != "MS4":
-			motifs = [random.choice([8,16,32,64,128])]
-			motif_length = [random.choice([10,17,25])]
+			motifs = [2**np.random.randint(2,9)]
+			motif_length = [np.random.randint(6,30)]
 		else:
-			motifs = [random.choice([4,8,16,32,64]), random.choice([4,8,16,32,64])]
-			motif_length = random.sample([7,10,17,25],2)
-		pooling = random.choice([-1,1,2])
-		stdev = random.choice([1e-1,1e-2,1e-3,1e-4,1e-5])
-		stdev_out = random.choice([1e-1,1e-2,1e-3,1e-4,1e-5])
-		w_decay = random.choice([1e-3,1e-5,1e-7,1e-9,1e-11])
-		w_out_decay = random.choice([1e-3,1e-5,1e-7,1e-9,1e-11])
-		extra_layer = random.choice([True, False])
+			motifs = [2**i for i in np.random.randint(2,9,size=2)]
+			motif_length = np.random.randint(6,30,size=2)
+		pooling = np.random.choice([-1,1,2])
+		stdev = 10**np.random.uniform(-14, -1)
+		stdev_out = 10**np.random.uniform(-10, -1)
+		w_decay = 10**np.random.uniform(-14, -1)
+		w_out_decay = 10**np.random.uniform(-14, -1)
+		extra_layer = np.random.choice([True, False])
 	
 	hyp_string = "model_label:{} , cutoff_value: {}, motif_length:{} , motifs: {}, stdev: {}, stdev_out: {}, w_decay: {}, w_out_decay: {}, pooling: {}, fully_connect: {}".format(model_label,  
 								cutoff, motif_length, motifs, stdev, stdev_out, w_decay, w_out_decay, pooling, extra_layer)
