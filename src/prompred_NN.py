@@ -147,8 +147,18 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 		w_decay = 10**np.random.uniform(-14, -1)
 		w_out_decay = 10**np.random.uniform(-14, -1)
 		extra_layer = np.random.choice([True, False])
+	if function =='t_rand':
+		cutoff = np.random.choice([-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.25,1.5,2,2.5])
+		motifs = [2**np.random.randint(6,9)]
+		motif_length = [np.random.randint(6,14)]
+		pooling = np.random.choice([-1,1,2])
+		stdev = 10**np.random.uniform(-14, -1)
+		stdev_out = 10**np.random.uniform(-10, -1)
+		w_decay = 10**np.random.uniform(-14, -1)
+		w_out_decay = 10**np.random.uniform(-14, -1)
+		extra_layer = np.random.choice([True])
 	
-	hyp_string = "model_label:{} , cutoff_value: {}, motif_length:{} , motifs: {}, stdev: {}, stdev_out: {}, w_decay: {}, w_out_decay: {}, pooling: {}, fully_connect: {}".format(model_label,  
+	hyp_string = "model_label:{} , cutoff_value:{} , motif_length:{} , motifs:{} , stdev:{} , stdev_out:{} , w_decay:{} , w_out_decay:{} , pooling:{} , fully_connect:{}".format(model_label,  
 								cutoff, motif_length, motifs, stdev, stdev_out, w_decay, w_out_decay, pooling, extra_layer)
 	localarg = locals()
 	LOGFILENAME, MAINLOG, RESULTLOG = log.LogInit(function, model_label, localarg, hyp_string)
@@ -165,7 +175,7 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 
 def main():
 	parser = argparse.ArgumentParser(description='high-end script function for prompred')
-	parser.add_argument('function', type=str,choices=('eval','no', 'rand'), help="function to execute")
+	parser.add_argument('function', type=str,choices=('eval','no', 'rand', 't_rand'), help="function to execute")
 	parser.add_argument('-d', '--data', type=str, choices=('RPOD', 'RPOS', 'RPON'), help='chooses data experiment')
 	parser.add_argument('-e', '--epochs', type=int, help='amount of epochs to train')
 	parser.add_argument('-r', '--repeats', type=int, help='amount of repeats of the experiment')
