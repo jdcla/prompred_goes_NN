@@ -33,7 +33,7 @@ def load_data(experiment, cutoff):
 	return X_full, Y_full 
 
 def load_model(model_label, ratio, motifs, motif_length, stdev, stdev_out, w_decay, 
-				w_out_decay, pooling, train_step, padding, extra_layer):
+				w_out_decay, pooling, train_step, padding, extra_layer, fc_nodes):
 
 	tf.reset_default_graph()
 	x = tf.placeholder(tf.float32, shape=[None, 50, 4], name="x")
@@ -43,7 +43,7 @@ def load_model(model_label, ratio, motifs, motif_length, stdev, stdev_out, w_dec
 	class_weight = tf.constant([[ratio, 1.0 - ratio]])
 	with tf.name_scope('Model'):
 		softmax_linear = mu.SelectModel(model_label, x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay, 
-										w_out_decay, pooling, num_classes=2, padding=False, extra_layer=False)
+										w_out_decay, pooling, num_classes=2, padding=padding, extra_layer=extra_layer, fc_nodes=fc_nodes)
 
 	with tf.name_scope('Loss'):
 		weight_per_label = tf.transpose( tf.matmul(y_, tf.transpose(class_weight)) )
@@ -133,6 +133,7 @@ def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_o
 def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, motifs, motif_length, stdev,
 					stdev_out, w_decay, w_out_decay, pooling=1, batch_size=40, train_step=1e-4, 
 					test_size=0.1, padding=False, extra_layer=False, verbose=False):
+	fc_nodes = 32
 	if function == "rand":
 		cutoff = np.random.choice([-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.25,1.5,2,2.5])
 		#cutoff = np.random.uniform([0,2.5])
@@ -149,6 +150,7 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 		w_out_decay = 10**np.random.uniform(-14, -1)
 		extra_layer = np.random.choice([True, False])
 	if function =='t_rand':
+		fc_nodes = np.random.choice([32,64,128,256])
 		cutoff = np.random.choice([-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.25,1.5,2,2.5])
 		motifs = [2**np.random.randint(6,9)]
 		motif_length = [np.random.randint(6,14)]
@@ -159,8 +161,8 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 		w_out_decay = 10**np.random.uniform(-14, -1)
 		extra_layer = np.random.choice([True])
 	
-	hyp_string = "model_label:{} , cutoff_value:{} , motif_length:{} , motifs:{} , stdev:{} , stdev_out:{} , w_decay:{} , w_out_decay:{} , pooling:{} , fully_connect:{}".format(model_label,  
-								cutoff, motif_length, motifs, stdev, stdev_out, w_decay, w_out_decay, pooling, extra_layer)
+	hyp_string = "model_label:{} , cutoff_value:{} , motif_length:{} , motifs:{} , stdev:{} , stdev_out:{} , w_decay:{} , w_out_decay:{} , pooling:{} , fully_connect:{} , fc_nodes:{} , padding:{}".format(model_label,  
+								cutoff, motif_length, motifs, stdev, stdev_out, w_decay, w_out_decay, pooling, extra_layer, fc_nodes, padding)
 	localarg = locals()
 	LOGFILENAME, MAINLOG, RESULTLOG = log.LogInit(function, model_label, localarg, hyp_string)
 	X, Y = load_data(experiment, cutoff)
@@ -168,7 +170,7 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 	
 	for repeat in range(repeats):
 		x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op = load_model(model_label, ratio, 
-									motifs, motif_length, stdev, stdev_out, w_decay, w_out_decay, pooling, train_step, padding, extra_layer)
+									motifs, motif_length, stdev, stdev_out, w_decay, w_out_decay, pooling, train_step, padding, extra_layer, fc_nodes)
 		results = run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op, 
 							X, Y, model_label, epochs, motif_length, batch_size, test_size, verbose)
 		log.LogWrap(MAINLOG, RESULTLOG, results, hyp_string, repeat, repeats)

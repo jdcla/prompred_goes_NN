@@ -157,8 +157,7 @@ def par_conv_split_duo(x, keep_prob, motifs_1, motifs_2, motif_length_1, motif_l
         return softmax_linear
 
 def par_conv_split(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay, 
-                   w_out_decay, pooling=1, num_classes=2, padding=False, extra_layer=False):
-    
+                   w_out_decay, pooling=1, num_classes=2, padding=False, extra_layer=False, fc_nodes=32):
     x_image = tf.reshape(x, [-1,1,50,4])
     padding = motif_length//2 if padding is True else 0
     pool_list = []
@@ -195,11 +194,19 @@ def par_conv_split(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay
     num_pool_values = motifs*par_conv*abs(pooling)
     layer2 = tf.reshape(tf.concat(pool_list, 1), [-1, num_pool_values])
     
-    if extra_layer is True:
+    if extra_layer:
+        print("hai")
         with tf.variable_scope('fully_connected'):
+            weights = variable_with_weight_decay('weights', shape=[num_pool_values, fc_nodes],
+                                              stddev=stdev_out, wd=w_out_decay)
+            biases = variable_on_cpu('biases', fc_nodes, tf.constant_initializer(0.1))
+            layer2 = tf.nn.relu(tf.matmul(layer2, weights) + biases)
+            num_pool_values = fc_nodes
+    if False:
+        with tf.variable_scope('fully_connected_2'):
             weights = variable_with_weight_decay('weights', shape=[num_pool_values, num_pool_values],
                                               stddev=stdev_out, wd=w_out_decay)
-            biases = variable_on_cpu('biases', motifs*par_conv, tf.constant_initializer(0.1))
+            biases = variable_on_cpu('biases', num_pool_values, tf.constant_initializer(0.1))
             layer2 = tf.nn.relu(tf.matmul(layer2, weights) + biases)
 
     with tf.variable_scope('out') as scope:
@@ -266,7 +273,7 @@ def conv_network(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay,
     
 
 def SelectModel(model_label, x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay, 
-                w_out_decay, pooling, num_classes=2, padding=False, extra_layer=False):
+                w_out_decay, pooling, num_classes=2, padding=False, extra_layer=False, fc_nodes=32):
     
     if model_label == "MS1":
         model = conv_network(x, keep_prob, motifs[0], motif_length[0], stdev, stdev_out, w_decay,
@@ -277,7 +284,7 @@ def SelectModel(model_label, x, keep_prob, motifs, motif_length, stdev, stdev_ou
     
     if model_label == "MS3":
         model = par_conv_split(x, keep_prob, motifs[0], motif_length[0], stdev, stdev_out, w_decay,
-                               w_out_decay, pooling, num_classes, padding, extra_layer)
+                               w_out_decay, pooling, num_classes, padding, extra_layer, fc_nodes)
     if model_label == "MS4":
         model = par_conv_split_duo(x, keep_prob, motifs[0], motifs[1], motif_length[0], motif_length[1], stdev, stdev_out, w_decay,
                                w_out_decay, pooling, num_classes, padding, extra_layer)
