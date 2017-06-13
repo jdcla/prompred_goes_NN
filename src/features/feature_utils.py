@@ -24,6 +24,14 @@ def AllocatePromoters(experiment, IDs):
     
     return mask_promoters
 
+def augment_sequences(X_batch, Y_batch):
+    X_batch_aug = np.copy(X_batch)
+    aug_rand = np.random.randint(15)
+    X_batch_aug[:,:aug_rand,:] = 0.25
+    X_batch_aug, Y_batch_aug = np.concatenate((X_batch,X_batch_aug)), np.concatenate((Y_batch,Y_batch))
+    
+    return X_batch_aug, Y_batch_aug
+    
 def BinaryOneHotEncoder(Y_bool):
     hot_array = np.zeros([len(Y_bool), 2], dtype=np.int8)
     for i in range(len(Y_bool)): 
