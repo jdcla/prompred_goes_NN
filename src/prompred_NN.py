@@ -22,7 +22,6 @@ def load_data(experiment, cutoff):
 
 	data_ip, data_mock_ip = du.GetDataLocations(experiment)
 	X_TSS, Y_TSS = fu.LoadDataTSS(path_TSS, experiment)
-	A_X, A_Y, B_X, B_Y, R_X, R_Y, M_X, M_Y, D_X, D_Y = fu.LoadValidationData()
 	X, Y, sequences, IDs = fu.TransformDataSimple(data_ip, data_mock_ip)
 	_, mask_peak = fu.DetectPeaks(Y,cutoff, smoothing=True)
 	mask_TSS = fu.AllocatePromoters(experiment, IDs)
@@ -34,7 +33,7 @@ def load_data(experiment, cutoff):
 	return X_full, Y_full 
 
 def load_model(model_label, ratio, motifs, motif_length, stdev, stdev_out, w_decay, 
-				w_out_decay, pooling, train_step, extra_layer):
+				w_out_decay, pooling, train_step, padding, extra_layer):
 
 	tf.reset_default_graph()
 	x = tf.placeholder(tf.float32, shape=[None, 50, 4], name="x")
@@ -107,8 +106,9 @@ def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_o
 			for run in range(runs):
 				X_batch = X_train_S[run*batch_size:(run+1)*batch_size]
 				Y_batch = Y_train_S[run*batch_size:(run+1)*batch_size]
+				X_batch_aug, Y_batch_aug = fu.augment_sequences(X_batch, Y_batch)
 				_, model_pred, model_loss, model_acc, summary = sess.run([step_op, softmax_op, loss_op, acc_op, summary_op],
-					feed_dict={x: X_batch , y_: Y_batch, keep_prob: 1})
+					feed_dict={x: X_batch_aug , y_: Y_batch_aug, keep_prob: 1})
 				avg_loss += model_loss/runs
 				avg_acc += model_acc/runs
 			softmax_test = softmax_op.eval(feed_dict={x: X_test , y_: Y_test, keep_prob: 1})
@@ -120,18 +120,19 @@ def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_o
 			D_spear.append(stats.spearmanr(softmax_op.eval(feed_dict={x: D_X , y_: Y_train[:len(M_X)], keep_prob: 1})[:,1], D_Y)[0])
 			avg_spear.append((A_spear[-1]+abs(B_spear[-1])+R_spear[-1]+M_spear[-1]+D_spear[-1])/5)
 			losses.append(avg_loss)
-			if verbose==True:
+			if verbose:
 				if (avg_spear[-1] > .73) and (np.all(avg_spear[:-1]<avg_spear[-1])):
 					saver.save(sess,"../models/model_{:%m:%d:%H:%M}_{}_epoch{}.ckpt".format(dt.datetime.now(), avg_spear[-1], epoch))
-				summary_writer.add_summary(summary, epoch)
-				saver.save(sess,"../models/model_{:%m:%d:%H:%M}_{:.3f}_epoch{}.ckpt".format(dt.datetime.now(), avg_spear[-1], epoch))
+			summary_writer.add_summary(summary, epoch)
+		if verbose:
+			saver.save(sess,"../models/model_{:%m:%d:%H:%M}_{:.3f}_epoch{}.ckpt".format(dt.datetime.now(), avg_spear[-1], epoch))
 	results = pd.DataFrame({"A_spear": A_spear, "B_spear": B_spear, "D_spear": D_spear, "R_spear": R_spear, "M_spear": M_spear, "AVG_spear": avg_spear, "AUC":AUCs})
 	
 	return results
 
 def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, motifs, motif_length, stdev,
-					stdev_out, w_decay, w_out_decay, pooling=1, batch_size=40, train_step=1e-4, test_size=0.1, extra_layer=False,
-					verbose=False):
+					stdev_out, w_decay, w_out_decay, pooling=1, batch_size=40, train_step=1e-4, 
+					test_size=0.1, padding=False, extra_layer=False, verbose=False):
 	if function == "rand":
 		cutoff = np.random.choice([-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.25,1.5,2,2.5])
 		#cutoff = np.random.uniform([0,2.5])
@@ -167,7 +168,7 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 	
 	for repeat in range(repeats):
 		x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op = load_model(model_label, ratio, 
-									motifs, motif_length, stdev, stdev_out, w_decay, w_out_decay, pooling, train_step, extra_layer)
+									motifs, motif_length, stdev, stdev_out, w_decay, w_out_decay, pooling, train_step, padding, extra_layer)
 		results = run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op, 
 							X, Y, model_label, epochs, motif_length, batch_size, test_size, verbose)
 		log.LogWrap(MAINLOG, RESULTLOG, results, hyp_string, repeat, repeats)
@@ -191,13 +192,14 @@ def main():
 	parser.add_argument('-P', '--pooling', type=int, choices=(-1,1,2), default=1, help="-1: avg pooling only, 1: max pooling only, 2: both pooling methods (features x2!)")
 	parser.add_argument('-LS', '--learning_step', type=float, default=1e-4, help="learning step of the model")
 	parser.add_argument('-TS', '--test_size', type=float, default=0.1, help="fraction of the data used as a test set")
+	parser.add_argument('-p', '--padding', action="store_true", help="add_padding")
 	parser.add_argument('-F', '--fully_connected', action="store_true", help="add fully connected layer behind main layer")
 	parser.add_argument('-v', '--verbose', action="store_true", help="create tensorboard model summaries")
 
 	args = parser.parse_args()
 	ExecuteFunction(args.function,  args.model, args.data, args.epochs, args.repeats, args.cutoff, args.motifs,
 					args.motif_length, args.stdev, args.stdev_out, args.weight_dec, args.weight_dec_out, args.pooling, args.batch_size,
-					args.learning_step, args.test_size, args.fully_connected, args.verbose)
+					args.learning_step, args.test_size, args.padding, args.fully_connected, args.verbose)
 
 
 
