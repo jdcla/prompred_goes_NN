@@ -151,6 +151,7 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 		extra_layer = np.random.choice([True, False])
 	if function =='t_rand':
 		fc_nodes = np.random.choice([32,64,128,256])
+		padding = np.random.choice([True, False])
 		cutoff = np.random.choice([-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.25,1.5,2,2.5])
 		motifs = [2**np.random.randint(6,9)]
 		motif_length = [np.random.randint(6,14)]
