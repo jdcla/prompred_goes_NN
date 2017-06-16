@@ -19,12 +19,12 @@ def GetDataLocations(sigma):
     OUTPUT
     -------
     """
-    experiments = {"RPOD":3, "RPOS":3, "RNAP":3}
+    experiments = {"RPOD":3, "RPOS":3, "RNAP":3, "SIGMA":2, "BETA":2}
     
     if sigma in experiments:
         for i in range(experiments[sigma]):
-            data_ip = ["../data/external/{}_EXP_{}_635.extr".format(sigma, u+1) for u in range(experiments[sigma])]
-            data_mock_ip = ["../data/external/{}_EXP_{}_532.extr".format(sigma, u+1) for u in range(experiments[sigma])]
+            data_ip = ["../data/processed/{}_EXP_{}_635.extr".format(sigma, u+1) for u in range(experiments[sigma])]
+            data_mock_ip = ["../data/processed/{}_EXP_{}_532.extr".format(sigma, u+1) for u in range(experiments[sigma])]
     else:
         return [], []
         

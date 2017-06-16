@@ -4,6 +4,7 @@ import sys
 import json
 import math
 import argparse
+import h5py
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -17,18 +18,61 @@ from scipy import stats
 from sklearn.utils import shuffle
 
 
-def load_data(experiment, cutoff):
+def load_data(experiment, cutoff, lowess):
 	path_TSS = "../data/external/promotor_list_exp_growth.csv"
+	if experiment == 'all':
+		with h5py.File('../data/processed/RPOD_low_Y.h5', 'r') as hf:
+			Y_R = hf['chip'][:]
+		with h5py.File('../data/processed/RPOD_low_X.h5', 'r') as hf:
+			X_R = hf['chip'][:]*1
+		IDs_R = pd.read_csv('../data/processed/RPOD_ID_list',header=None).values.ravel()
+		X_TSS, Y_TSS = fu.LoadDataTSS(path_TSS, 'RPOD')
+		mask_TSS = fu.AllocatePromoters(experiment, IDs_R)
+		_, mask_peak_R = fu.DetectPeaks(Y_R,cutoff, smoothing=True)
+		mask = np.any([mask_peak_R,mask_TSS],axis=0)
+		Y_masked = fu.BinaryOneHotEncoder(mask)
+		Y_full = np.vstack((Y_masked, Y_TSS))
+		X_full = np.vstack((X_R, X_TSS))
+		with h5py.File('../data/processed/SIGMA_low_Y.h5', 'r') as hf:
+			Y_S = hf['chip'][:]
+		with h5py.File('../data/processed/SIGMA_low_X.h5', 'r') as hf:
+			X_S = hf['chip'][:]*1
+		_, mask_peak_S = fu.DetectPeaks(Y_S,cutoff, smoothing=True)
+		Y_masked_S = fu.BinaryOneHotEncoder(mask_peak_S)
+		with h5py.File('../data/processed/BETA_low_Y.h5', 'r') as hf:
+			Y_B = hf['chip'][:]
+		with h5py.File('../data/processed/BETA_low_X.h5', 'r') as hf:
+			X_B = hf['chip'][:]*1
+		_, mask_peak_B = fu.DetectPeaks(Y_B,cutoff, smoothing=True)
+		Y_masked_B = fu.BinaryOneHotEncoder(mask_peak_B)
+		X_full = np.vstack((X_full, X_S, X_B))
+		Y_full = np.vstack((Y_full, Y_masked_S, Y_masked_B))
 
-	data_ip, data_mock_ip = du.GetDataLocations(experiment)
-	X_TSS, Y_TSS = fu.LoadDataTSS(path_TSS, experiment)
-	X, Y, sequences, IDs = fu.TransformDataSimple(data_ip, data_mock_ip)
-	_, mask_peak = fu.DetectPeaks(Y,cutoff, smoothing=True)
-	mask_TSS = fu.AllocatePromoters(experiment, IDs)
-	mask = np.any([mask_peak,mask_TSS],axis=0)
-	Y_masked = fu.BinaryOneHotEncoder(mask)
-	Y_full = np.vstack((Y_masked, Y_TSS))
-	X_full = np.vstack((X, X_TSS))
+	elif experiment == 'SIGMA':
+		data_ip, data_mock_ip = du.GetDataLocations(experiment)
+		X, Y, sequences, IDs = fu.TransformDataSimple(data_ip, data_mock_ip)
+		_, mask_peak = fu.DetectPeaks(Y,cutoff, smoothing=True)
+		Y_masked = fu.BinaryOneHotEncoder(mask_peak)
+		
+		return X, Y_masked
+
+	else:
+		if lowess:
+			with h5py.File('../data/processed/RPOD_low_Y.h5', 'r') as hf:
+				Y = hf['chip'][:]
+			with h5py.File('../data/processed/RPOD_low_X.h5', 'r') as hf:
+				X = hf['chip'][:]*1
+			IDs = pd.read_csv('../data/processed/RPOD_ID_list',header=None).values.ravel()
+		else:
+			data_ip, data_mock_ip = du.GetDataLocations(experiment)
+			X, Y, sequences, IDs = fu.TransformDataSimple(data_ip, data_mock_ip)
+		X_TSS, Y_TSS = fu.LoadDataTSS(path_TSS, experiment)
+		_, mask_peak = fu.DetectPeaks(Y,cutoff, smoothing=True)
+		mask_TSS = fu.AllocatePromoters(experiment, IDs)
+		mask = np.any([mask_peak,mask_TSS],axis=0)
+		Y_masked = fu.BinaryOneHotEncoder(mask)
+		Y_full = np.vstack((Y_masked, Y_TSS))
+		X_full = np.vstack((X, X_TSS))
 	
 	return X_full, Y_full 
 
@@ -119,6 +163,7 @@ def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_o
 			M_spear.append(stats.spearmanr(softmax_op.eval(feed_dict={x: M_X , y_: Y_train[:len(M_X)], keep_prob: 1})[:,1], M_Y)[0])
 			D_spear.append(stats.spearmanr(softmax_op.eval(feed_dict={x: D_X , y_: Y_train[:len(M_X)], keep_prob: 1})[:,1], D_Y)[0])
 			avg_spear.append((A_spear[-1]+abs(B_spear[-1])+R_spear[-1]+M_spear[-1]+D_spear[-1])/5)
+			print(avg_spear[-1], AUCs[-1])
 			losses.append(avg_loss)
 			if verbose:
 				if (avg_spear[-1] > .73) and (np.all(avg_spear[:-1]<avg_spear[-1])):
@@ -132,7 +177,7 @@ def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_o
 
 def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, motifs, motif_length, stdev,
 					stdev_out, w_decay, w_out_decay, pooling=1, batch_size=40, train_step=1e-4, 
-					test_size=0.1, padding=False, extra_layer=False, verbose=False):
+					test_size=0.1, padding=False, extra_layer=False, verbose=False, lowess=False):
 	fc_nodes = 32
 	if function == "rand":
 		cutoff = np.random.choice([-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.25,1.5,2,2.5])
@@ -166,7 +211,7 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 								cutoff, motif_length, motifs, stdev, stdev_out, w_decay, w_out_decay, pooling, extra_layer, fc_nodes, padding)
 	localarg = locals()
 	LOGFILENAME, MAINLOG, RESULTLOG = log.LogInit(function, model_label, localarg, hyp_string)
-	X, Y = load_data(experiment, cutoff)
+	X, Y = load_data(experiment, cutoff, lowess)
 	ratio = sum(Y[:,1]==1)/len(Y)
 	
 	for repeat in range(repeats):
@@ -180,9 +225,9 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 def main():
 	parser = argparse.ArgumentParser(description='high-end script function for prompred')
 	parser.add_argument('function', type=str,choices=('eval','no', 'rand', 't_rand'), help="function to execute")
-	parser.add_argument('-d', '--data', type=str, choices=('RPOD', 'RPOS', 'RPON'), help='chooses data experiment')
+	parser.add_argument('-d', '--data', type=str, choices=('RPOD', 'RPOS', 'RPON', 'SIGMA', 'BETA', 'all'), help='chooses data experiment')
 	parser.add_argument('-e', '--epochs', type=int, help='amount of epochs to train')
-	parser.add_argument('-r', '--repeats', type=int, help='amount of repeats of the experiment')
+	parser.add_argument('-r', '--repeats', type=int, default=1, help='amount of repeats of the experiment')
 	parser.add_argument('-m', '--model', type=str, choices=('MS1','MS2','MS3','MS4'), help=' type of architecture of the model')
 	parser.add_argument('-c', '--cutoff', type=float, help="cutoff value to select datasets from ")
 	parser.add_argument('-b', '--batch_size', type=int, default=40, help="determines batch size")
@@ -198,11 +243,11 @@ def main():
 	parser.add_argument('-p', '--padding', action="store_true", help="add_padding")
 	parser.add_argument('-F', '--fully_connected', action="store_true", help="add fully connected layer behind main layer")
 	parser.add_argument('-v', '--verbose', action="store_true", help="create tensorboard model summaries")
-
+	parser.add_argument('-l', '--lowess', action="store_true")
 	args = parser.parse_args()
 	ExecuteFunction(args.function,  args.model, args.data, args.epochs, args.repeats, args.cutoff, args.motifs,
 					args.motif_length, args.stdev, args.stdev_out, args.weight_dec, args.weight_dec_out, args.pooling, args.batch_size,
-					args.learning_step, args.test_size, args.padding, args.fully_connected, args.verbose)
+					args.learning_step, args.test_size, args.padding, args.fully_connected, args.verbose, args.lowess)
 
 
 

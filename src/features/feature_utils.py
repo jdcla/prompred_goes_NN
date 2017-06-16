@@ -9,7 +9,42 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from statsmodels import robust
+from math import ceil
 
+def lowess(x, y, f=2. / 3., iter=3):
+    """lowess(x, y, f=2./3., iter=3) -> yest
+    Lowess smoother: Robust locally weighted regression.
+    The lowess function fits a nonparametric regression curve to a scatterplot.
+    The arrays x and y contain an equal number of elements; each pair
+    (x[i], y[i]) defines a data point in the scatterplot. The function returns
+    the estimated (smooth) values of y.
+    The smoothing span is given by f. A larger value for f will result in a
+    smoother curve. The number of robustifying iterations is given by iter. The
+    function will run faster with a smaller number of iterations.
+    """
+    n = len(x)
+    r = int(ceil(f * n))
+    h = [np.sort(np.abs(x - x[i]))[r] for i in range(n)]
+    w = np.clip(np.abs((x[:, None] - x[None, :]) / h), 0.0, 1.0)
+    w = (1 - w ** 3) ** 3
+    yest = np.zeros(n)
+    delta = np.ones(n)
+    for iteration in range(iter):
+        for i in range(n):
+            weights = delta * w[:, i]
+            b = np.array([np.sum(weights * y), np.sum(weights * y * x)])
+            A = np.array([[np.sum(weights), np.sum(weights * x)],
+                          [np.sum(weights * x), np.sum(weights * x * x)]])
+            beta = linalg.solve(A, b)
+            yest[i] = beta[0] + beta[1] * x[i]
+
+        residuals = y - yest
+        s = np.median(np.abs(residuals))
+        delta = np.clip(residuals / (6.0 * s), -1, 1)
+        delta = (1 - delta ** 2) ** 2
+
+    return yest
+    
 def AllocatePromoters(experiment, IDs):
     
     TSS_info = pd.read_csv("../data/external/TSS_info.csv")
@@ -26,11 +61,10 @@ def AllocatePromoters(experiment, IDs):
 
 def augment_sequences(X_batch, Y_batch):
     X_batch_aug = np.copy(X_batch)
-    aug_rand = np.random.randint(15)
-    X_batch_aug[:,:aug_rand,:] = 0.25
-    X_batch_aug, Y_batch_aug = np.concatenate((X_batch,X_batch_aug)), np.concatenate((Y_batch,Y_batch))
-    
-    return X_batch_aug, Y_batch_aug
+    if np.random.rand()>=0.5:
+        aug_rand = np.random.randint(15)
+        X_batch_aug[:,:aug_rand,:] = 0.25
+    return X_batch_aug, Y_batch
     
 def BinaryOneHotEncoder(Y_bool):
     hot_array = np.zeros([len(Y_bool), 2], dtype=np.int8)
@@ -175,7 +209,6 @@ def TransformDataSimple(data_ip, data_mock_ip):
     ip_norm_mean = np.mean(ip_norm, axis=1)
     mock_ip_norm_mean = np.mean(mock_ip_norm, axis=1)
     fold_mean = ip_norm_mean - mock_ip_norm_mean
-
     sequences_img = CreateImageFromSequences(sequences)
 
-    return  sequences_img, mean_fold, sequences, IDs
+    return  sequences_img, fold_mean, sequences, IDs

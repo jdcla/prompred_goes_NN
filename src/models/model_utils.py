@@ -202,12 +202,6 @@ def par_conv_split(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay
             biases = variable_on_cpu('biases', fc_nodes, tf.constant_initializer(0.1))
             layer2 = tf.nn.relu(tf.matmul(layer2, weights) + biases)
             num_pool_values = fc_nodes
-    if False:
-        with tf.variable_scope('fully_connected_2'):
-            weights = variable_with_weight_decay('weights', shape=[num_pool_values, num_pool_values],
-                                              stddev=stdev_out, wd=w_out_decay)
-            biases = variable_on_cpu('biases', num_pool_values, tf.constant_initializer(0.1))
-            layer2 = tf.nn.relu(tf.matmul(layer2, weights) + biases)
 
     with tf.variable_scope('out') as scope:
         weights = variable_with_weight_decay('weights', shape=[num_pool_values, num_classes],
