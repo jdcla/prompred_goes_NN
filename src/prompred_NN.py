@@ -113,12 +113,11 @@ def load_model(model_label, ratio, motifs, motif_length, stdev, stdev_out, w_dec
 	return x, y_, keep_prob, var_init, summary_op, softmax_linear, accuracy, loss, step_op
 
 
-def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op,
+def run_model(timestamp, par_dict, x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op,
 				X, Y, model_label, epochs, motif_length, batch_size, test_size, verbose):
 
 	X_train, X_test, Y_train, Y_test = fu.CreateBalancedTrainTest(X,Y, test_size)
 	A_X, A_Y, B_X, B_Y, R_X, R_Y, M_X, M_Y, D_X, D_Y = fu.LoadValidationData()
-	
 	
 	v_out = [v for v in tf.trainable_variables() if v.name == "out/weights:0"]
 	if model_label == "MS2":
@@ -166,11 +165,13 @@ def run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_o
 			print(avg_spear[-1], AUCs[-1])
 			losses.append(avg_loss)
 			if verbose:
-				if (avg_spear[-1] > .73) and (np.all(avg_spear[:-1]<avg_spear[-1])):
-					saver.save(sess,"../models/model_{:%m:%d:%H:%M}_{}_epoch{}.ckpt".format(dt.datetime.now(), avg_spear[-1], epoch))
-			summary_writer.add_summary(summary, epoch)
+				if (avg_spear[-1] > .70) and (np.all(avg_spear[:-1]<avg_spear[-1])):
+					saver.save(sess,"../models/model_{}_{}_epoch{}.ckpt".format(timestamp, avg_spear[-1], epoch))
+					with open('../models/model_{}_{}_epoch{}.json'.format(timestamp, avg_spear[-1], epoch), 'w') as outfile:
+						json.dump(par_dict, outfile)
+				summary_writer.add_summary(summary, epoch)
 		if verbose:
-			saver.save(sess,"../models/model_{:%m:%d:%H:%M}_{:.3f}_epoch{}.ckpt".format(dt.datetime.now(), avg_spear[-1], epoch))
+			saver.save(sess,"../models/model_{}_{:.3f}_epoch{}.ckpt".format(timestamp, avg_spear[-1], epoch))
 	results = pd.DataFrame({"A_spear": A_spear, "B_spear": B_spear, "D_spear": D_spear, "R_spear": R_spear, "M_spear": M_spear, "AVG_spear": avg_spear, "AUC":AUCs})
 	
 	return results
@@ -180,14 +181,15 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 					test_size=0.1, padding=False, extra_layer=False, verbose=False, lowess=False):
 	fc_nodes = 32
 	if function == "rand":
+		model_label = np.random.choice(['MS3','MS4'])
 		cutoff = np.random.choice([-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.25,1.5,2,2.5])
 		#cutoff = np.random.uniform([0,2.5])
 		if model_label != "MS4":
-			motifs = [2**np.random.randint(2,9)]
-			motif_length = [np.random.randint(6,30)]
+			motifs = [2**np.random.randint(6,9)]
+			motif_length = [np.random.randint(6,14)]
 		else:
-			motifs = [2**i for i in np.random.randint(2,9,size=2)]
-			motif_length = np.random.randint(6,30,size=2)
+			motifs = [2**i for i in np.random.randint(6,9,size=2)]
+			motif_length = np.random.randint(6,14,size=2)
 		pooling = np.random.choice([-1,1,2])
 		stdev = 10**np.random.uniform(-14, -1)
 		stdev_out = 10**np.random.uniform(-10, -1)
@@ -206,18 +208,19 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 		w_decay = 10**np.random.uniform(-14, -1)
 		w_out_decay = 10**np.random.uniform(-14, -1)
 		extra_layer = np.random.choice([True])
-	
 	hyp_string = "model_label:{} , cutoff_value:{} , motif_length:{} , motifs:{} , stdev:{} , stdev_out:{} , w_decay:{} , w_out_decay:{} , pooling:{} , fully_connect:{} , fc_nodes:{} , padding:{}".format(model_label,  
 								cutoff, motif_length, motifs, stdev, stdev_out, w_decay, w_out_decay, pooling, extra_layer, fc_nodes, padding)
 	localarg = locals()
-	LOGFILENAME, MAINLOG, RESULTLOG = log.LogInit(function, model_label, localarg, hyp_string)
+	LOGFILENAME, MAINLOG, RESULTLOG, timestamp = log.LogInit(function, model_label, localarg, hyp_string)
 	X, Y = load_data(experiment, cutoff, lowess)
 	ratio = sum(Y[:,1]==1)/len(Y)
-	
+	par_dict = {"model_label": model_label, "ratio":ratio, "motifs":motifs, "motif_length":motif_length, "stdev":stdev, "stdev_out":stdev_out, 
+	"w_decay":w_decay, "w_out_decay":w_out_decay, "pooling":pooling, "train_step":train_step, "padding":padding, "extra_layer":extra_layer, 
+	"fc_nodes":fc_nodes}
 	for repeat in range(repeats):
 		x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op = load_model(model_label, ratio, 
 									motifs, motif_length, stdev, stdev_out, w_decay, w_out_decay, pooling, train_step, padding, extra_layer, fc_nodes)
-		results = run_model(x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op, 
+		results = run_model(timestamp, par_dict, x, y_, keep_prob, var_init, summary_op, softmax_op, acc_op, loss_op, step_op, 
 							X, Y, model_label, epochs, motif_length, batch_size, test_size, verbose)
 		log.LogWrap(MAINLOG, RESULTLOG, results, hyp_string, repeat, repeats)
 

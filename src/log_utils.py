@@ -26,7 +26,7 @@ def LogInit(function, model, arg_dict, hyp_string):
     with open(MAINLOG, 'a') as f:   f.write(output)
     f.close()
     print(output)
-    return LOGFILENAME, MAINLOG, RESULTLOG
+    return LOGFILENAME, MAINLOG, RESULTLOG, time
     
 def LogWrap(MAINLOG, RESULTLOG, results, hyp_string, repeat, repeats):
 
