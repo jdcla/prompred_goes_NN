@@ -166,8 +166,8 @@ def run_model(timestamp, par_dict, x, y_, keep_prob, var_init, summary_op, softm
 			losses.append(avg_loss)
 			if verbose:
 				if (avg_spear[-1] > .70) and (np.all(avg_spear[:-1]<avg_spear[-1])):
-					saver.save(sess,"../models/model_{}_{}_epoch{}.ckpt".format(timestamp, avg_spear[-1], epoch))
-					with open('../models/model_{}_{}_epoch{}.json'.format(timestamp, avg_spear[-1], epoch), 'w') as outfile:
+					saver.save(sess,"../models/model_{}_{:2.03f}_epoch{}.ckpt".format(timestamp, avg_spear[-1], epoch))
+					with open('../models/model_{}_{:2.03f}_epoch{}.json'.format(timestamp, avg_spear[-1], epoch), 'w') as outfile:
 						json.dump(par_dict, outfile)
 				summary_writer.add_summary(summary, epoch)
 		if verbose:
