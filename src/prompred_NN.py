@@ -49,12 +49,20 @@ def load_data(experiment, cutoff, lowess):
 		Y_full = np.vstack((Y_full, Y_masked_S, Y_masked_B))
 
 	elif experiment == 'SIGMA':
-		data_ip, data_mock_ip = du.GetDataLocations(experiment)
-		X, Y, sequences, IDs = fu.TransformDataSimple(data_ip, data_mock_ip)
-		_, mask_peak = fu.DetectPeaks(Y,cutoff, smoothing=True)
-		Y_masked = fu.BinaryOneHotEncoder(mask_peak)
-		
-		return X, Y_masked
+		with h5py.File('../data/processed/SIGMA_low_Y.h5', 'r') as hf:
+			Y_S = hf['chip'][:]
+		with h5py.File('../data/processed/SIGMA_low_X.h5', 'r') as hf:
+			X_S = hf['chip'][:]*1
+		_, mask_peak_S = fu.DetectPeaks(Y_S,cutoff, smoothing=True)
+		Y_masked_S = fu.BinaryOneHotEncoder(mask_peak_S)
+		with h5py.File('../data/processed/BETA_low_Y.h5', 'r') as hf:
+			Y_B = hf['chip'][:]
+		with h5py.File('../data/processed/BETA_low_X.h5', 'r') as hf:
+			X_B = hf['chip'][:]*1
+		_, mask_peak_B = fu.DetectPeaks(Y_B,cutoff, smoothing=True)
+		Y_masked_B = fu.BinaryOneHotEncoder(mask_peak_B)
+		X_full = np.vstack((X_S, X_B))
+		Y_full = np.vstack((Y_masked_S, Y_masked_B))
 
 	else:
 		if lowess:
@@ -178,8 +186,7 @@ def run_model(timestamp, par_dict, x, y_, keep_prob, var_init, summary_op, softm
 
 def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, motifs, motif_length, stdev,
 					stdev_out, w_decay, w_out_decay, pooling=1, batch_size=40, train_step=1e-4, 
-					test_size=0.1, padding=False, extra_layer=False, verbose=False, lowess=False):
-	fc_nodes = 32
+					test_size=0.1, fc_nodes=32, padding=False, extra_layer=False, verbose=False, lowess=False):
 	if function == "rand":
 		model_label = np.random.choice(['MS3','MS4'])
 		cutoff = np.random.choice([-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.25,1.5,2,2.5])
@@ -207,7 +214,7 @@ def ExecuteFunction(function, model_label, experiment, epochs, repeats, cutoff, 
 		stdev_out = 10**np.random.uniform(-10, -1)
 		w_decay = 10**np.random.uniform(-14, -1)
 		w_out_decay = 10**np.random.uniform(-14, -1)
-		extra_layer = np.random.choice([True])
+		extra_layer = np.random.choice([True, False])
 	hyp_string = "model_label:{} , cutoff_value:{} , motif_length:{} , motifs:{} , stdev:{} , stdev_out:{} , w_decay:{} , w_out_decay:{} , pooling:{} , fully_connect:{} , fc_nodes:{} , padding:{}".format(model_label,  
 								cutoff, motif_length, motifs, stdev, stdev_out, w_decay, w_out_decay, pooling, extra_layer, fc_nodes, padding)
 	localarg = locals()
@@ -243,6 +250,7 @@ def main():
 	parser.add_argument('-P', '--pooling', type=int, choices=(-1,1,2), default=1, help="-1: avg pooling only, 1: max pooling only, 2: both pooling methods (features x2!)")
 	parser.add_argument('-LS', '--learning_step', type=float, default=1e-4, help="learning step of the model")
 	parser.add_argument('-TS', '--test_size', type=float, default=0.1, help="fraction of the data used as a test set")
+	parser.add_argument('-FC', '--fc_nodes', type=int, default=32, help="# nodes in fully connected layer")
 	parser.add_argument('-p', '--padding', action="store_true", help="add_padding")
 	parser.add_argument('-F', '--fully_connected', action="store_true", help="add fully connected layer behind main layer")
 	parser.add_argument('-v', '--verbose', action="store_true", help="create tensorboard model summaries")
@@ -250,7 +258,7 @@ def main():
 	args = parser.parse_args()
 	ExecuteFunction(args.function,  args.model, args.data, args.epochs, args.repeats, args.cutoff, args.motifs,
 					args.motif_length, args.stdev, args.stdev_out, args.weight_dec, args.weight_dec_out, args.pooling, args.batch_size,
-					args.learning_step, args.test_size, args.padding, args.fully_connected, args.verbose, args.lowess)
+					args.learning_step, args.test_size, args.fc_nodes, args.padding, args.fully_connected, args.verbose, args.lowess)
 
 
 

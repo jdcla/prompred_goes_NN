@@ -195,7 +195,6 @@ def par_conv_split(x, keep_prob, motifs, motif_length, stdev, stdev_out, w_decay
     layer2 = tf.reshape(tf.concat(pool_list, 1), [-1, num_pool_values])
     
     if extra_layer:
-        print("hai")
         with tf.variable_scope('fully_connected'):
             weights = variable_with_weight_decay('weights', shape=[num_pool_values, fc_nodes],
                                               stddev=stdev_out, wd=w_out_decay)
